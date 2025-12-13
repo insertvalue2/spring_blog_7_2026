@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 서비스 레이어 (Service Layer)
@@ -54,36 +55,74 @@ public class BoardService {
     /**
      * 게시글 목록 조회
      * 
+     * OSIV False 환경 대응:
+     * - 트랜잭션 내에서 필요한 데이터를 모두 조회하고 DTO로 변환
+     * - JOIN FETCH로 Board와 User를 한 번의 쿼리로 함께 조회
+     * - 엔티티를 DTO로 변환하여 반환 (LAZY 로딩 문제 방지)
+     * 
      * 트랜잭션:
      * - 읽기 전용 트랜잭션 (readOnly = true)
      * - 성능 최적화: 변경 작업이 없으므로 읽기 전용으로 설정
      * 
-     * @return 게시글 목록 (생성일 기준 내림차순)
+     * @return 게시글 목록 DTO (생성일 기준 내림차순)
      */
     @Transactional(readOnly = true)
-    public List<Board> 게시글목록조회() {
-        // Repository의 쿼리 메서드 호출
-        // findAllByOrderByCreatedAtDesc(): 생성일 기준 내림차순 정렬
-        return boardRepository.findAllByOrderByCreatedAtDesc();
+    public List<BoardResponse.ListDTO> 게시글목록조회() {
+        // JOIN FETCH로 Board와 User를 한 번의 쿼리로 함께 조회
+        // N+1 문제 해결 및 OSIV False 환경 대응
+        List<Board> boardList = boardRepository.findAllWithUserOrderByCreatedAtDesc();
+        
+        // 트랜잭션 내에서 엔티티를 DTO로 변환
+        // Stream을 사용하여 각 Board 엔티티를 ListDTO로 변환
+        
+        // [방법 1] 메서드 참조 사용 (현재 사용 중인 방법)
+        // BoardResponse.ListDTO::new 는 생성자 메서드 참조
+        // 각 Board 객체를 ListDTO 생성자에 전달하여 변환
+        return boardList.stream()
+                .map(BoardResponse.ListDTO::new)  // 메서드 참조: board -> new BoardResponse.ListDTO(board) 와 동일
+                .collect(Collectors.toList());
+        
+        // [방법 2] 람다 표현식 사용
+        // 메서드 참조 대신 람다 표현식으로 명시적으로 작성
+        // return boardList.stream()
+        //         .map(board -> new BoardResponse.ListDTO(board))  // 람다 표현식
+        //         .collect(Collectors.toList());
+        
+        // [방법 3] for문 사용 (전통적인 방법)
+        // Stream을 사용하지 않고 for문으로 직접 변환
+        // List<BoardResponse.ListDTO> dtoList = new ArrayList<>();
+        // for (Board board : boardList) {
+        //     BoardResponse.ListDTO dto = new BoardResponse.ListDTO(board);
+        //     dtoList.add(dto);
+        // }
+        // return dtoList;
     }
 
     /**
      * 게시글 상세 조회
      * 
+     * OSIV False 환경 대응:
+     * - 트랜잭션 내에서 필요한 데이터를 모두 조회하고 DTO로 변환
+     * - JOIN FETCH로 Board와 User를 한 번의 쿼리로 함께 조회
+     * - 엔티티를 DTO로 변환하여 반환 (LAZY 로딩 문제 방지)
+     * 
      * Optional 처리:
-     * - findById()는 Optional<Board>를 반환
+     * - findByIdWithUser()는 Optional<Board>를 반환
      * - orElseThrow(): 값이 없으면 예외 발생, 있으면 Board 반환
      * 
      * @param id 게시글 ID
-     * @return 게시글 엔티티
+     * @return 게시글 상세 DTO
      * @throws Exception404 게시글이 없을 경우
      */
     @Transactional(readOnly = true)
-    public Board 게시글상세조회(Long id) {
-        // Optional을 사용한 null 안전 처리
-        // 게시글이 없으면 Exception404 발생
-        return boardRepository.findById(id)
+    public BoardResponse.DetailDTO 게시글상세조회(Long id) {
+        // JOIN FETCH로 Board와 User를 한 번의 쿼리로 함께 조회
+        // N+1 문제 해결 및 OSIV False 환경 대응
+        Board board = boardRepository.findByIdWithUser(id)
                 .orElseThrow(() -> new Exception404("게시글을 찾을 수 없어요 : "));
+        
+        // 트랜잭션 내에서 엔티티를 DTO로 변환
+        return new BoardResponse.DetailDTO(board);
     }
 
     /**
@@ -111,20 +150,25 @@ public class BoardService {
     /**
      * 게시글 수정 화면용 조회 (인가 검사 포함)
      * 
+     * OSIV False 환경 대응:
+     * - 트랜잭션 내에서 필요한 데이터를 모두 조회하고 DTO로 변환
+     * - JOIN FETCH로 Board와 User를 한 번의 쿼리로 함께 조회
+     * - 엔티티를 DTO로 변환하여 반환 (LAZY 로딩 문제 방지)
+     * 
      * 인가 검사:
      * - 게시글 소유자만 수정 가능
      * - isOwner() 메서드로 소유자 확인
      * 
      * @param id 게시글 ID
      * @param userId 현재 로그인한 사용자 ID
-     * @return 게시글 엔티티
+     * @return 게시글 수정 화면 DTO
      * @throws Exception404 게시글이 없을 경우
      * @throws Exception403 수정 권한이 없을 경우
      */
     @Transactional(readOnly = true)
-    public Board 게시글수정화면(Long id, Long userId) {
-        // 게시글 조회
-        Board board = boardRepository.findById(id)
+    public BoardResponse.UpdateFormDTO 게시글수정화면(Long id, Long userId) {
+        // JOIN FETCH로 Board와 User를 한 번의 쿼리로 함께 조회
+        Board board = boardRepository.findByIdWithUser(id)
                 .orElseThrow(() -> new Exception404("게시글을 찾을 수 없습니다"));
 
         // 인가 검사: 게시글 소유자인지 확인
@@ -132,7 +176,8 @@ public class BoardService {
             throw new Exception403("게시글 수정 권한 없음");
         }
 
-        return board;
+        // 트랜잭션 내에서 엔티티를 DTO로 변환
+        return new BoardResponse.UpdateFormDTO(board);
     }
 
     /**

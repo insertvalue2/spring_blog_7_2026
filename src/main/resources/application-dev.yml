@@ -43,6 +43,11 @@ spring:
 
   # JPA 설정
   jpa:
+    # Open Session in View (OSIV) 설정
+    # false: 트랜잭션 종료 시 세션 종료 (권장)
+    # true: 뷰 렌더링까지 세션 유지 (기본값, 비권장)
+    # OSIV false일 때는 Service에서 필요한 데이터를 모두 조회하고 DTO로 변환하여 반환해야 함
+    open-in-view: false
     hibernate:
       # create: 애플리케이션 시작시 테이블을 새로 생성
       # 기존 데이터는 모두 삭제됨 (개발용)

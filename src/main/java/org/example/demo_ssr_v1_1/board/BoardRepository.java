@@ -1,9 +1,12 @@
 package org.example.demo_ssr_v1_1.board;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 게시글 Repository 인터페이스
@@ -57,6 +60,46 @@ public interface BoardRepository extends JpaRepository<Board, Long> {
      * List<Board> boards = boardRepository.findAllByOrderByCreatedAtDesc();
      */
     List<Board> findAllByOrderByCreatedAtDesc();
+    
+    /**
+     * 게시글 전체 조회 (작성자 정보 포함, JOIN FETCH 사용)
+     * 
+     * JOIN FETCH란?
+     * - 연관된 엔티티를 한 번의 쿼리로 함께 조회하는 JPA 기능
+     * - N+1 문제를 해결하고 성능을 최적화
+     * 
+     * 동작 방식:
+     * - Board와 User를 한 번의 쿼리로 함께 조회
+     * - LAZY 로딩이 설정되어 있어도 즉시 로딩됨
+     * - OSIV false 환경에서도 안전하게 사용 가능
+     * 
+     * 생성되는 SQL:
+     * SELECT b.*, u.* 
+     * FROM board_tb b 
+     * INNER JOIN user_tb u ON b.user_id = u.id 
+     * ORDER BY b.created_at DESC
+     * 
+     * @return 작성자 정보가 포함된 게시글 목록 (생성일 기준 내림차순)
+     */
+    @Query("SELECT b FROM Board b JOIN FETCH b.user ORDER BY b.createdAt DESC")
+    List<Board> findAllWithUserOrderByCreatedAtDesc();
+    
+    /**
+     * 게시글 ID로 조회 (작성자 정보 포함, JOIN FETCH 사용)
+     * 
+     * JOIN FETCH를 사용하여 Board와 User를 한 번의 쿼리로 함께 조회합니다.
+     * 
+     * 생성되는 SQL:
+     * SELECT b.*, u.* 
+     * FROM board_tb b 
+     * INNER JOIN user_tb u ON b.user_id = u.id 
+     * WHERE b.id = ?
+     * 
+     * @param id 게시글 ID
+     * @return 작성자 정보가 포함된 게시글 (Optional)
+     */
+    @Query("SELECT b FROM Board b JOIN FETCH b.user WHERE b.id = :id")
+    Optional<Board> findByIdWithUser(@Param("id") Long id);
     
     /**
      * JpaRepository에서 자동 제공되는 메서드들:

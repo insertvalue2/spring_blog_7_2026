@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 
 import java.util.List;
 
+
 /**
  * 게시글 Controller (표현 계층)
  * 
@@ -74,7 +75,8 @@ public class BoardController {
         // 2. Service에 비즈니스 로직 위임
         // - 게시글 조회
         // - 인가 검사 (소유자 확인)
-        Board board = boardService.게시글수정화면(id, sessionUser.getId());
+        // - ResponseDTO로 반환 (OSIV False 환경 대응)
+        BoardResponse.UpdateFormDTO board = boardService.게시글수정화면(id, sessionUser.getId());
 
         // 3. View에 데이터 전달
         model.addAttribute("board", board);
@@ -117,7 +119,7 @@ public class BoardController {
      * Controller의 역할:
      * - HTTP 요청 처리
      * - Service에 비즈니스 로직 위임
-     * - View에 데이터 전달
+     * - View에 데이터 전달 (ResponseDTO 사용)
      * 
      * @param model View에 전달할 데이터
      * @return View 이름
@@ -126,7 +128,8 @@ public class BoardController {
     public String boardList(Model model) {
         // Service에 비즈니스 로직 위임
         // - 게시글 목록 조회 (생성일 기준 내림차순 정렬)
-        List<Board> boardList = boardService.게시글목록조회();
+        // - ResponseDTO로 반환 (OSIV False 환경 대응)
+        List<BoardResponse.ListDTO> boardList = boardService.게시글목록조회();
         
         // View에 데이터 전달
         model.addAttribute("boardList", boardList);
@@ -209,7 +212,7 @@ public class BoardController {
      * Controller의 역할:
      * - HTTP 요청 처리
      * - Service에 비즈니스 로직 위임
-     * - View에 데이터 전달
+     * - View에 데이터 전달 (ResponseDTO 사용)
      * 
      * @param id 게시글 ID
      * @param model View에 전달할 데이터
@@ -220,15 +223,17 @@ public class BoardController {
     public String detail(@PathVariable Long id, Model model, HttpSession session) {
         // Service에 비즈니스 로직 위임
         // - 게시글 조회
-        Board board = boardService.게시글상세조회(id);
+        // - ResponseDTO로 반환 (OSIV False 환경 대응)
+        BoardResponse.DetailDTO board = boardService.게시글상세조회(id);
 
         // 세션에서 로그인 사용자 정보 조회 (없을 수도 있음)
         User sessionUser = (User) session.getAttribute("sessionUser");
         
         // 게시글 소유자 여부 확인
+        // DetailDTO의 userId와 세션 사용자 ID를 비교
         boolean isOwner = false;
-        if (sessionUser != null && board.getUser() != null) {
-            isOwner = board.isOwner(sessionUser.getId());
+        if (sessionUser != null && board.getUserId() != null) {
+            isOwner = board.getUserId().equals(sessionUser.getId());
         }
 
         // View에 데이터 전달
